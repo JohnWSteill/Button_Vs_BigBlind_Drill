@@ -154,6 +154,8 @@ def wait_for_key_with_timeout(timeout_seconds: int = 600) -> bool:
                     ch: str = sys.stdin.read(1)
                     if ch == "\x03":  # Ctrl-C
                         raise KeyboardInterrupt
+                    if ch.lower() == "q":
+                        raise KeyboardInterrupt
                     if ch in (" ", "\r", "\n"):
                         key_pressed.set()
                         return
@@ -220,14 +222,34 @@ def main():
 
     seed = args.seed
     timeout = args.timeout
+    rng = random.Random(seed)
 
     for i in range(1, args.hands + 1):
+        # Generate BB range annotation
+        range_lower = rng.uniform(20, 80)
+        range_upper = rng.uniform(2, 0.5 * range_lower)
+
+        # Round to nearest 0.5%
+        def round_half(x: float) -> str:
+            val = round(x * 2) / 2
+            if val.is_integer():
+                return f"{int(val)}%"
+            else:
+                return f"{val:.1f}%"
+
+        # Generate stack depth (log-normal, clamp, round to nearest 10)
+        stack_depth_raw = rng.lognormvariate(4.5, 0.5)
+        stack_depth = int(min(max(stack_depth_raw, 40), 1000))
+        stack_depth = int(round(stack_depth / 10) * 10)
+        range_str = f"BB Range: {round_half(range_upper)} - {round_half(range_lower)} | Stack: {stack_depth} BBs"
+
         hand, board = deal_btn_open_and_board(seed=seed)
         # Increment seed to avoid identical outputs when repeatedly seeding
         if seed is not None:
             seed += 1
 
         print(f"\nHand {i}:")
+        print(range_str)
         print(f"Preflop: {format_card(hand[0])} {format_card(hand[1])}")
         wait_for_key_with_timeout(timeout)
 
